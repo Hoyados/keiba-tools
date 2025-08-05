@@ -75,7 +75,7 @@ def add_feature(df):
     df["日付"] = pd.to_datetime(df["日付"])
     df["月"] = df["日付"].dt.to_period("M")
 
-    df["倍率帯"] = pd.cut(df["倍率"], bins=[0, 4, 8, 12, 100], labels=["1〜4倍", "4〜8倍", "8〜12倍", "12倍以上"])
+    df["倍率帯"] = pd.cut(df["倍率"], bins=[0, 2.5, 4, 8, 100], labels=["1〜2.5倍", "2.6〜4倍", "4〜8倍", "8倍以上"])
 
     return df
 
@@ -128,16 +128,18 @@ def plotgraph (temp1, temp2, xlabel, y1label, y2label):
     plt.savefig("output/" + xlabel +".png")
 
 # 棒グラフ描画関数
-def bargraph (temp1):
-    fig, ax = plt.subplots()
-    ax.bar(temp1.index.astype(str), temp1.values)
-    xlabel = "月毎の結果"
+def bargraph (temp1, label):
+    fig, ax = plt.subplots(figsize = (6,6))
+    ax.bar(temp1.index, temp1.values, width = 0.1)
+    ax.set_xlim(1.0, 4.0)
+    xlabel = f"{label}"
+    fig.tight_layout()
     plt.savefig("output/" + xlabel +".png")
 
 # ヒートマップ描画関数
 def heatmapgraph (pivot_table, label1, label2, value, max = 100, min = 0):
     fig, ax = plt.subplots(figsize = (8, 8))
-    sns.heatmap(pivot_table, annot = True, cmap = "coolwarm", ax = ax, fmt = ".0f", square = True, vmax = max, vmin = min)
+    sns.heatmap(pivot_table, annot = True, cmap = "coolwarm", ax = ax, fmt = ".0f", square = True, vmax = max, vmin = min, linewidths = 0.5)
     plt.title(f"{label1}と{label2}による{value}ヒートマップ")
     fig.tight_layout()
     plt.savefig(f"output/{label1}x{label2}_{value}.png")
@@ -147,7 +149,6 @@ def main():
     df = cleandata(df)
     df = add_feature(df)
     df.to_csv("output/cleaned-keibadata.csv", index = False)
-    df = df[df["日付"] > "2025-05-31"]
     hitrate = summarize_by(df, "馬券種別", "的中", "mean", False) * 100
     returnrate = summarize_by(df, "馬券種別", "収支差", "sum", False)
     plotgraph (hitrate, returnrate, "馬券種別", "的中率(%)", "収支差(円)")
@@ -169,9 +170,42 @@ def main():
     buymoney = heatmap_data(df, "馬券種別", "倍率帯", "購入金額", "sum")
     counts = heatmap_data(df, "馬券種別", "倍率帯", "的中", "count")
     pivot_table = returnmoney / buymoney * 100
-    heatmapgraph (pivot_table, "馬券種別", "倍率帯", "回収率", 300, 0)
+    heatmapgraph (pivot_table, "馬券種別", "倍率帯", "回収率", 200, 0)
     pivot_table = (returnmoney - buymoney) / counts
-    heatmapgraph (pivot_table, "馬券種別", "倍率帯", "一回あたりの収支", 300, -300)
+    heatmapgraph (pivot_table, "馬券種別", "倍率帯", "一回あたりの収支", 200, -200)
+
+    temp_df = df[df["馬券種別"].isin(["複勝"])]
+    temp = summarize_by (temp_df, "倍率", "的中", "count")
+    bargraph (temp, "複勝の倍率分布")
+    temp_df = df[df["馬券種別"].isin(["ワイド"])]
+    temp = summarize_by (temp_df, "倍率", "的中", "count")
+    bargraph (temp, "ワイドの倍率分布")
+
+    temp_df = df[df["馬券種別"].isin(["単勝", "ワイド"])]
+    hitrate = summarize_by(temp_df, "馬券種別", "的中", "mean", False) * 100
+    returnrate = summarize_by(temp_df, "馬券種別", "収支差", "sum", False)
+    plotgraph (hitrate, returnrate, "単勝・ワイド", "的中率(%)", "収支差(円)")
+    hitrate = summarize_by(temp_df, "倍率帯", "的中", "mean", False) * 100
+    returnrate = summarize_by(temp_df, "倍率帯", "収支差", "sum", False)
+    plotgraph (hitrate, returnrate, "倍率帯(単勝・ワイドのみ)", "的中率(%)", "収支差(円)")
+    hitrate = summarize_by(temp_df, "月", "的中", "mean", True) * 100
+    returnrate = summarize_by(temp_df, "月", "収支差", "sum", True)
+    plotgraph (hitrate, returnrate, "月(単勝・ワイドのみ)", "的中率(%)", "収支差(円)")
+    pivot_table = heatmap_data(temp_df, "馬券種別", "倍率帯", "収支差", "sum")
+    heatmapgraph (pivot_table, "単勝・ワイド", "倍率帯", "収支", 1200, -1200)
+    pivot_table = heatmap_data(temp_df, "馬券種別", "倍率帯", "的中", "mean") * 100
+    heatmapgraph (pivot_table, "単勝・ワイド", "倍率帯", "的中率", 100, 0)
+    pivot_table = heatmap_data(temp_df, "馬券種別", "倍率帯", "的中", "count")
+    heatmapgraph (pivot_table, "単勝・ワイド", "倍率帯", "購入回数", 30, 0)
+    pivot_table = heatmap_data(temp_df, "馬券種別", "倍率帯", "的中", "sum")
+    heatmapgraph (pivot_table, "単勝・ワイド", "倍率帯", "的中回数", 30, 0)
+    returnmoney = heatmap_data(temp_df, "馬券種別", "倍率帯", "払い戻し", "sum")
+    buymoney = heatmap_data(temp_df, "馬券種別", "倍率帯", "購入金額", "sum")
+    counts = heatmap_data(temp_df, "馬券種別", "倍率帯", "的中", "count")
+    pivot_table = returnmoney / buymoney * 100
+    heatmapgraph (pivot_table, "単勝・ワイド", "倍率帯", "回収率", 200, 0)
+    pivot_table = (returnmoney - buymoney) / counts
+    heatmapgraph (pivot_table, "単勝・ワイド", "倍率帯", "一回あたりの収支", 200, -200)
 
 if __name__ == "__main__":
     main()
