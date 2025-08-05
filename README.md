@@ -62,3 +62,4 @@ keiba-tools/
 - Pandasによるcsv読み込み、整形処理
 - matplotlib / seabornによるグラフ描画
 - 複数軸によるデータ可視化と、それを用いた戦略評価
+- Github使用方法
